@@ -8,6 +8,10 @@ set(TREEFINDER_SOURCES
 	treefinder.cpp
 )
 
+set(SUPERSEEKER_SOURCES
+	superseeker.cpp
+)
+
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 if (NOT "${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang") # clang Doesnt use pthread
    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
@@ -20,6 +24,14 @@ add_executable(treefinder
   ${TREEFINDER_SOURCES}
 )
 
+add_executable(superseeker
+  ${SUPERSEEKER_SOURCES}
+)
+
 target_link_libraries(treefinder
   ${CORE_LIB}
+)
+
+target_link_libraries(superseeker
+  ${CORE_NEW_LIB}
 )

@@ -1,6 +1,8 @@
 #pragma once
 
+#include "Noncopyable.hpp"
 #include "Tree.h"
+#include "ForestBuilder.h"
 
 #include <string>
 #include <memory>
@@ -10,25 +12,25 @@
 
 namespace treefinder
 {
-	class TreeBuilder
+	class TreeBuilder : private Noncopyable
 	{
 	public:
 		typedef std::shared_ptr< TreeBuilder > SharedPtr;
         TreeBuilder(const std::string& filePath, float threshold);
+        TreeBuilder() = delete;
 		~TreeBuilder();
 
-		TreeBuilder( const TreeBuilder& noncopyable) = delete;
-		TreeBuilder& operator=( const TreeBuilder& noncopyable) = delete;
-		TreeBuilder() = delete;
-
-		std::vector< Tree::SharedPtr > getTreesFromProportions1(const std::vector< std::tuple< char, float > >& proportions);
-		std::vector< Tree::SharedPtr > getTreesFromProportions(const std::vector< std::tuple< char, float > >& proportions);
+		std::vector< SampleTrees::SharedPtr > getProcessedSampleTreesPtrs();
 
 	private:
+		void populateTreesFromProportions(const std::vector< std::tuple< char, float > >& proportions, std::vector< Tree::SharedPtr >* treePtrsPtr);
 		std::unordered_map< std::string, std::vector< std::tuple< char, float > > > extractSampleProportionsFromFile(const std::string& filePath);
-		void populateSampleProportions(const std::unordered_map< std::string, std::vector< std::tuple< char, float > > >& samplesProportions);
+		ForestBuilder::SharedPtr getForestFromSampleProportions(const std::unordered_map< std::string, std::vector< std::tuple< char, float > > >& samplesProportions);
 
-		std::unordered_map< std::string, std::vector< Tree::SharedPtr > > m_all_sample_proportions;
+		std::vector< Tree::SharedPtr > getTreesFromProportions1(const std::vector< std::tuple< char, float > >& proportions);
+
+		ForestBuilder::SharedPtr m_forest_builder;
+		std::string m_file_path;
 		float m_threshold;
 	};
 }

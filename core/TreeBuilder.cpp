@@ -1,17 +1,24 @@
 #include "TreeBuilder.h"
 
 #include <iostream>
+#include <future>
 
 namespace treefinder
 {
-	TreeBuilder::TreeBuilder(const std::string& filePath, float threshold) : m_threshold(threshold)
+	TreeBuilder::TreeBuilder(const std::string& filePath, float threshold) : m_file_path(filePath), m_threshold(threshold)
 	{
-		auto samplesProportions = extractSampleProportionsFromFile(filePath);
-		populateSampleProportions(samplesProportions);
+
 	}
 
 	TreeBuilder::~TreeBuilder()
 	{
+	}
+
+	std::vector< SampleTrees::SharedPtr > TreeBuilder::getProcessedSampleTreesPtrs()
+	{
+		auto samplesProportions = extractSampleProportionsFromFile(this->m_file_path);
+		m_forest_builder = getForestFromSampleProportions(samplesProportions);
+		return m_forest_builder->getTrimmedSampleTrees();
 	}
 
 	std::unordered_map< std::string, std::vector< std::tuple< char, float > > > TreeBuilder::extractSampleProportionsFromFile(const std::string& filePath)
@@ -40,6 +47,16 @@ namespace treefinder
 		*/
 		std::unordered_map< std::string, std::vector< std::tuple< char, float > > > proportionsMap;
 		std::vector< std::tuple< char, float > > proportions;
+		// std::tuple< char, float > C1 = std::make_tuple('1', 0.40);
+		// std::tuple< char, float > C2 = std::make_tuple('2', 0.28);
+		// std::tuple< char, float > C3 = std::make_tuple('3', 0.8);
+		// std::tuple< char, float > C4 = std::make_tuple('4', 0.24);
+		proportionsMap["B0"] = {std::make_tuple('1', 0.40), std::make_tuple('2', 0.28), std::make_tuple('3', 0.8), std::make_tuple('6', 0.24)};
+		proportionsMap["B1"] = {std::make_tuple('1', 0.50), std::make_tuple('2', 0.06), std::make_tuple('4', 0.36), std::make_tuple('5', 0.08)};
+		proportionsMap["B2"] = {std::make_tuple('7', 0.60), std::make_tuple('8', 0.20)};
+		proportionsMap["B3"] = {std::make_tuple('7', 0.28), std::make_tuple('8', 0.16), std::make_tuple('9', 0.36)};
+		proportionsMap["B4"] = {std::make_tuple('7', 0.40)};
+		/*
 		std::tuple< char, float > A = std::make_tuple('A', 0.7);
 		std::tuple< char, float > B = std::make_tuple('B', 0.1);
 		std::tuple< char, float > C = std::make_tuple('C', 0.08);
@@ -69,22 +86,40 @@ namespace treefinder
 		proportions.emplace_back(M);
 		proportions.emplace_back(N);
 		proportionsMap["FOO"] = proportions;
+		proportionsMap["BAR"] = proportions;
+		proportionsMap["BIZ"] = proportions;
+		proportionsMap["BAZ"] = proportions;
+		*/
 		return proportionsMap;
 	}
 
-	void TreeBuilder::populateSampleProportions(const std::unordered_map< std::string, std::vector< std::tuple< char, float > > >& samplesProportions)
+	ForestBuilder::SharedPtr TreeBuilder::getForestFromSampleProportions(const std::unordered_map< std::string, std::vector< std::tuple< char, float > > >& samplesProportions)
 	{
-		this->m_all_sample_proportions.clear();
+		std::vector< SampleTrees::SharedPtr > sampleTreesPtrs(samplesProportions.size());
+		int count = 0;
+		std::vector< std::future< void > > futureFuncts;
 		for (auto iter : samplesProportions)
 		{
-			auto sampleProportions = getTreesFromProportions(iter.second);
-			this->m_all_sample_proportions.emplace(iter.first, sampleProportions);
+			std::string sampleName = iter.first;
+			std::vector< std::tuple< char, float > > proportions(iter.second);
+			SampleTrees::SharedPtr sampleTreesPtr = std::make_shared< SampleTrees >(sampleName);
+			auto funct = [this, count, sampleTreesPtr, proportions, &sampleTreesPtrs]()
+			{
+				populateTreesFromProportions(proportions, sampleTreesPtr->getTreePtrsRef());
+				sampleTreesPtrs[count] = sampleTreesPtr;
+			};
+			futureFuncts.emplace_back(std::async(funct));
+			++count;
 		}
+		for (auto& futureFunct : futureFuncts)
+		{
+			futureFunct.wait();
+		}
+		ForestBuilder::SharedPtr forestBuilderPtr = std::make_shared< ForestBuilder >(sampleTreesPtrs);
 	}
 
-	std::vector< Tree::SharedPtr > TreeBuilder::getTreesFromProportions(const std::vector< std::tuple< char, float > >& proportions)
+	void TreeBuilder::populateTreesFromProportions(const std::vector< std::tuple< char, float > >& proportions, std::vector< Tree::SharedPtr >* treePtrsPtr)
 	{
-		std::vector< Tree::SharedPtr > treePtrs;
 		std::vector< int > parents(proportions.size(), 0);
 		parents[0] = -1; // the root doesn't have a parent
 		for (int i = 1; i < parents.size(); ++i) // initialize the array
@@ -95,8 +130,6 @@ namespace treefinder
 		int parent = currentIdx - 1;
 		while (true)
 		{
-			// auto treePtr = std::make_shared< Tree >(proportions, parents);
-			// std::shared_ptr< std::tuple< char, float > > treePtr = nullptr;
 			if (parent < 0)
 			{
 				do
@@ -135,12 +168,11 @@ namespace treefinder
 			}
 			std::cout << std::endl;
 			*/
-			treePtrs.emplace_back(nullptr);
+			auto treePtr = std::make_shared< Tree >(proportions, parents);
+			treePtrsPtr->emplace_back(treePtr);
 			--parent;
 		}
-		std::cout << "trees: " << treePtrs.size() << std::endl;
-		// exit(0);
-		return treePtrs;
+		std::cout << "trees: " << treePtrsPtr->size() << std::endl;
 	}
 
 	std::vector< Tree::SharedPtr > TreeBuilder::getTreesFromProportions1(const std::vector< std::tuple< char, float > >& proportions)

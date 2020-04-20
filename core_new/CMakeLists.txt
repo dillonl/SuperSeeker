@@ -7,14 +7,16 @@ if (NOT "${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang") # clang Doesnt use pthread
 endif()
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fpermissive")
 
-set(TREEBUILDER_SOURCES
-  Tree.cpp
+set(POPULATION_SOURCES
+  PopulationFileProcessor.cpp
+  Population.cpp
+  Sample.cpp
+  SamplesProcessor.cpp
   TreeBuilder.cpp
-  ForestBuilder.cpp
-  )
-
-add_library(treebuilder_core STATIC
-  ${TREEBUILDER_SOURCES}
 )
 
-SET(CORE_LIB treebuilder_core CACHE STRING "THE CORE LIBRARY")
+add_library(population_core STATIC
+  ${POPULATION_SOURCES}
+)
+
+SET(CORE_NEW_LIB population_core CACHE STRING "THE CORE NEW LIBRARY")
