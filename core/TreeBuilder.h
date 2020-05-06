@@ -1,36 +1,31 @@
 #pragma once
 
-#include "Noncopyable.hpp"
 #include "Tree.h"
-#include "ForestBuilder.h"
+#include "SamplesProcessor.h"
 
-#include <string>
-#include <memory>
-#include <unordered_map>
 #include <vector>
-#include <tuple>
+#include <memory>
 
-namespace treefinder
+namespace superseeker
 {
-	class TreeBuilder : private Noncopyable
+	class TreeBuilder
 	{
 	public:
 		typedef std::shared_ptr< TreeBuilder > SharedPtr;
-        TreeBuilder(const std::string& filePath, float threshold);
-        TreeBuilder() = delete;
-		~TreeBuilder();
+		TreeBuilder(const std::vector< Sample::SharedPtr >& samplePtrs, float threshold);
 
-		std::vector< SampleTrees::SharedPtr > getProcessedSampleTreesPtrs();
+		std::vector< Tree::SharedPtr > generateAllPossibleTrees();
 
 	private:
-		void populateTreesFromProportions(const std::vector< std::tuple< char, float > >& proportions, std::vector< Tree::SharedPtr >* treePtrsPtr);
-		std::unordered_map< std::string, std::vector< std::tuple< char, float > > > extractSampleProportionsFromFile(const std::string& filePath);
-		ForestBuilder::SharedPtr getForestFromSampleProportions(const std::unordered_map< std::string, std::vector< std::tuple< char, float > > >& samplesProportions);
+		std::vector< Tree::SharedPtr > validatedTrees(const std::vector< Tree::SharedPtr >& potentialTreePtrs);
+		std::vector< Tree::SharedPtr > generateAllTreesFromRoot(int rootID);
+		void setPotentialRoots();
+		void setPotentialRelationships();
 
-		std::vector< Tree::SharedPtr > getTreesFromProportions1(const std::vector< std::tuple< char, float > >& proportions);
-
-		ForestBuilder::SharedPtr m_forest_builder;
-		std::string m_file_path;
+		std::vector< int > m_potential_root_ids;
+		std::unordered_map< int, std::vector< int > > m_potential_cluster_id_children_id_map;
+		std::unordered_map< int, std::vector< int > > m_potential_cluster_id_parent_id_map;
+		std::vector< Sample::SharedPtr > m_sample_ptrs;
 		float m_threshold;
 	};
 }

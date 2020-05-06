@@ -1,34 +1,32 @@
 #pragma once
 
-#include "Noncopyable.hpp"
+#include "Node.h"
+#include "Sample.h"
 
-#include <memory>
+#include <unordered_map>
 #include <vector>
-#include <tuple>
 
-namespace treefinder
+namespace superseeker
 {
-	class Tree : private Noncopyable
+	class Tree
 	{
 	public:
 		typedef std::shared_ptr< Tree > SharedPtr;
-		Tree(const std::vector< std::tuple< char, float > >& proportions, std::vector< int >& parents);
+		Tree(const Tree& noncopyable) = delete;
+		Tree operator=(const Tree& noncopyable) = delete;
 		Tree() = delete;
-		~Tree();
-	};
 
-	class SampleTrees : private Noncopyable
-	{
-	public:
-		typedef std::shared_ptr< SampleTrees > SharedPtr;
-	    SampleTrees(std::string& sampleName) : m_sample_name(sampleName) {}
-		SampleTrees() = delete;
-		~SampleTrees() {}
-		std::string getSampleName() { return m_sample_name; }
-		std::vector< Tree::SharedPtr >* getTreePtrsRef() { return &m_trees; }
+		Tree(const std::vector< int >& parentsList);
+		~Tree();
+
+		bool isValidTree(const std::vector< Sample::SharedPtr >& samplePtrs, float threshold);
 
 	private:
-		std::string m_sample_name;
-		std::vector< Tree::SharedPtr > m_trees;
+		bool isValidSampleTree(Sample::SharedPtr samplePtr, int threshold);
+
+		Node::SharedPtr m_root_node_ptr;
+		std::vector< Node::SharedPtr > m_parents_list;
+		std::unordered_map< int, Node::SharedPtr > m_node_map;
+		std::vector< Node::SharedPtr > m_leaf_node_ptrs;
 	};
 }

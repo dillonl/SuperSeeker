@@ -6,18 +6,12 @@ namespace superseeker
 	SamplesProcessor::SamplesProcessor(std::vector< Sample::SharedPtr > samplePtrs) :
 		m_sample_ptrs(samplePtrs)
 	{
-		std::function< std::unordered_set< std::string >(const Population::SharedPtr) > parentsFunct = &Population::getPotentialDirectParentsSymbols;
-		std::function< std::unordered_set< std::string >(const Population::SharedPtr) > childrenFunct = &Population::getPotentialDirectChildrenSymbols;
-		setAllSymbols();
-		m_valid_children_across_samples = getValidSymbolsAcrossSamples(childrenFunct);
-		m_valid_parents_across_samples = getValidSymbolsAcrossSamples(parentsFunct);
-		setAllPotentialRootSymbols();
-		/*
-		for (auto symbol : this->m_all_symbols)
-		{
-			std::cout << symbol << ": " << m_valid_parents_across_samples[symbol].size() << std::endl;
-		}
-		*/
+		std::function< std::unordered_set< int >(const Cluster::SharedPtr) > parentsFunct = &Cluster::getPotentialDirectParentsIndices;
+		std::function< std::unordered_set< int >(const Cluster::SharedPtr) > childrenFunct = &Cluster::getPotentialDirectChildrenIndices;
+		setAllIndices();
+		// m_valid_children_across_samples = getValidSymbolsAcrossIndices(childrenFunct);
+		// m_valid_parents_across_samples = getValidSymbolsAcrossIndices(parentsFunct);
+		setAllPotentialRootIndices();
 	}
 
 	SamplesProcessor::~SamplesProcessor()
@@ -37,15 +31,14 @@ namespace superseeker
 		}
 	}
 
-	void SamplesProcessor::setAllSymbols()
+	void SamplesProcessor::setAllIndices()
 	{
-		// std::unordered_set< std::string > allSymbols;
-		m_all_symbols.empty();
-		for (auto samplePtr : m_sample_ptrs)
+		this->m_all_indices.empty();
+		for (auto samplePtr : this->m_sample_ptrs)
 		{
-			for (auto populationPtr : samplePtr->getPopulationPtrs())
+			for (auto clusterPtr : samplePtr->getClusterPtrs())
 			{
-				m_all_symbols.emplace(populationPtr->getSymbol());
+				this->m_all_indices.emplace(clusterPtr->getIndex());
 			}
 		}
 	}
@@ -58,7 +51,8 @@ namespace superseeker
 		return treePtrs;
 	}
 
-	std::unordered_map< std::string, std::unordered_set< std::string > > SamplesProcessor::getValidSymbolsAcrossSamples(std::function< std::unordered_set< std::string >(const Population::SharedPtr) >& funct)
+	/*
+	std::unordered_map< std::string, std::unordered_set< std::string > > SamplesProcessor::getValidSymbolsAcrossIndices(std::function< std::unordered_set< int >(const Cluster::SharedPtr) >& funct)
 	{
 		std::unordered_map< std::string, std::unordered_set< std::string > > validSymbolMap; // all the parents (rep as symbol) with the consequent child symbol as the key
 		for (auto symbol : this->m_all_symbols)
@@ -67,10 +61,10 @@ namespace superseeker
 			for (auto s : this->m_all_symbols) { parentsCount.emplace(s, 0); }
 			for (auto samplePtr : this->m_sample_ptrs)
 			{
-				for (auto populationPtr : samplePtr->getPopulationPtrs())
+				for (auto clusterPtr : samplePtr->getClusterPtrs())
 				{
-					if (populationPtr->getSymbol().compare(symbol) != 0) { continue; }
-					auto pp = funct(populationPtr);
+					if (clusterPtr->getSymbol().compare(symbol) != 0) { continue; }
+					auto pp = funct(clusterPtr);
 					for (auto parentSymbol : pp)
 					{
 						parentsCount[parentSymbol] = parentsCount[parentSymbol] + 1;
@@ -98,55 +92,57 @@ namespace superseeker
 			std::cout << " } " << std::endl;
 		}
 		*/
+	/*
 		return validSymbolMap;
 	}
+	*/
 
-	void SamplesProcessor::setAllPotentialRootSymbols()
+	void SamplesProcessor::setAllPotentialRootIndices()
 	{
-		m_root_symbols.empty();
+		this->m_root_indices.empty();
 		for (auto samplePtr : this->m_sample_ptrs)
 		{
-			for (auto populationPtr : samplePtr->getPopulationPtrs())
+			for (auto clusterPtr : samplePtr->getClusterPtrs())
 			{
-				auto symbol = populationPtr->getSymbol();
-				auto frequency = populationPtr->getFrequency();
+				auto clusterIndex = clusterPtr->getIndex();
+				auto frequency = clusterPtr->getFrequency();
 				float frequencySum = 0;
-				for (auto pp : samplePtr->getPopulationPtrs())
+				for (auto pp : samplePtr->getClusterPtrs())
 				{
-					if (pp->getSymbol().compare(symbol) == 0) { continue; } // we don't want to accumulate our frequency
+					if (pp->getIndex() == clusterIndex) { continue; } // we don't want to accumulate our frequency
 					frequencySum += pp->getFrequency();
 				}
 				if (frequency >= frequencySum)
 				{
-					m_root_symbols.emplace(symbol);
+					this->m_root_indices.emplace(clusterIndex);
 				}
 			}
 		}
 	}
 
-	std::vector< std::string > SamplesProcessor::getSymbolsAsListWithRootAsFirst(const std::string& rootSymbol)
+	std::vector< int > SamplesProcessor::getIndicesAsListWithRootAsFirst(int rootIndex)
 	{
-		std::vector< std::string > symbols(m_all_symbols.begin(), m_all_symbols.end());
-		for (int i = 1; i < symbols.size(); ++i)
+		std::vector< int > indices(this->m_all_indices.begin(), this->m_all_indices.end());
+		for (int i = 1; i < indices.size(); ++i)
 		{
-			if (symbols[i].compare(rootSymbol) == 0)
+			if (indices[i] == rootIndex)
 			{
-				std::string zeroSymbol = symbols[0];
-				symbols[i] = zeroSymbol;
-				symbols[0] = rootSymbol;
+				int zeroIndex = indices[0];
+				indices[i] = zeroIndex;
+				indices[0] = rootIndex;
 				break;
 			}
 		}
-		return symbols;
+		return indices;
 	}
 
-	std::unordered_map< std::string, std::vector< std::string > > SamplesProcessor::getValidParentsAsMapWithList()
+	std::unordered_map< int, std::vector< int > > SamplesProcessor::getValidParentsAsMapWithList()
 	{
-		std::unordered_map< std::string, std::vector< std::string > > parentsMap;
+		std::unordered_map< int, std::vector< int > > parentsMap;
 		for (auto iter : m_valid_parents_across_samples)
 		{
-			auto parentsSymbols = m_valid_parents_across_samples[iter.first];
-			std::vector< std::string > parentsContainer(parentsSymbols.size());
+			auto parentsIndices = m_valid_parents_across_samples[iter.first];
+			std::vector< std::string > parentsContainer(parentsIndices.size());
 			int count = 0;
 			for (auto parentSymbol : parentsSymbols)
 			{
@@ -157,9 +153,10 @@ namespace superseeker
 		return parentsMap;
 	}
 
-	std::vector< std::vector< int > > SamplesProcessor::getParentsSymbolsAsIdxs(const std::vector< std::string >& symbols)
+	/*
+	std::vector< std::vector< int > > SamplesProcessor::getParentsSymbolsAsIdxs(const std::vector< int >& indices)
 	{
-		std::unordered_map< std::string, int > symbolToIdx;
+		std::unordered_map< int, int > indexToArrayIndex;
 		for (int i = 0; i < symbols.size(); ++i)
 		{
 			symbolToIdx[symbols[i]] = i;
@@ -177,6 +174,7 @@ namespace superseeker
 		}
 		return parentsIdxs;
 	}
+	*/
 
 	/*
 	void SamplesProcessor::calculateValidParentsAndChildrensAcrossSamples()

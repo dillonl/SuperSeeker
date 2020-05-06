@@ -1,272 +1,168 @@
 #include "TreeBuilder.h"
+#include "Tree.h"
 
-#include <iostream>
-#include <future>
+#include <cstdlib>
 
-namespace treefinder
+namespace superseeker
 {
-	TreeBuilder::TreeBuilder(const std::string& filePath, float threshold) : m_file_path(filePath), m_threshold(threshold)
-	{
 
+	TreeBuilder::TreeBuilder(const std::vector< Sample::SharedPtr >& samplePtrs, float threshold) :
+		m_sample_ptrs(samplePtrs),
+		m_threshold(threshold)
+	{
+		setPotentialRoots();
+		setPotentialRelationships();
 	}
 
-	TreeBuilder::~TreeBuilder()
+	void TreeBuilder::setPotentialRoots()
 	{
-	}
-
-	std::vector< SampleTrees::SharedPtr > TreeBuilder::getProcessedSampleTreesPtrs()
-	{
-		auto samplesProportions = extractSampleProportionsFromFile(this->m_file_path);
-		m_forest_builder = getForestFromSampleProportions(samplesProportions);
-		return m_forest_builder->getTrimmedSampleTrees();
-	}
-
-	std::unordered_map< std::string, std::vector< std::tuple< char, float > > > TreeBuilder::extractSampleProportionsFromFile(const std::string& filePath)
-	{
-		// for now the format is going to be:
-		// samplename\t{label_1:proportion_1,label_2:proportion_2,...,label_3:proportion_n]\n
-		/*
-		FILE* fp = fopen(filePath.c_str(), "r");
-		if (fp == NULL)
+		if (this->m_sample_ptrs.size() == 0) { return; }
+		auto clusterIDs = this->m_sample_ptrs[0]->getAllClusterIDs();
+		for (int clusterID : clusterIDs)
 		{
-			exit(EXIT_FAILURE);
-		}
-
-		char* line = NULL;
-		size_t len = 0;
-		while ((getline(&line, &len, fp)) != -1)
-		{
-			// using printf() in all tests for consistency
-			printf("%s", line);
-		}
-		fclose(fp);
-		if (line)
-		{
-			free(line);
-		}
-		*/
-		std::unordered_map< std::string, std::vector< std::tuple< char, float > > > proportionsMap;
-		std::vector< std::tuple< char, float > > proportions;
-		// std::tuple< char, float > C1 = std::make_tuple('1', 0.40);
-		// std::tuple< char, float > C2 = std::make_tuple('2', 0.28);
-		// std::tuple< char, float > C3 = std::make_tuple('3', 0.8);
-		// std::tuple< char, float > C4 = std::make_tuple('4', 0.24);
-		proportionsMap["B0"] = {std::make_tuple('1', 0.40), std::make_tuple('2', 0.28), std::make_tuple('3', 0.8), std::make_tuple('6', 0.24)};
-		proportionsMap["B1"] = {std::make_tuple('1', 0.50), std::make_tuple('2', 0.06), std::make_tuple('4', 0.36), std::make_tuple('5', 0.08)};
-		proportionsMap["B2"] = {std::make_tuple('7', 0.60), std::make_tuple('8', 0.20)};
-		proportionsMap["B3"] = {std::make_tuple('7', 0.28), std::make_tuple('8', 0.16), std::make_tuple('9', 0.36)};
-		proportionsMap["B4"] = {std::make_tuple('7', 0.40)};
-		/*
-		std::tuple< char, float > A = std::make_tuple('A', 0.7);
-		std::tuple< char, float > B = std::make_tuple('B', 0.1);
-		std::tuple< char, float > C = std::make_tuple('C', 0.08);
-		std::tuple< char, float > D = std::make_tuple('D', 0.06);
-		std::tuple< char, float > E = std::make_tuple('E', 0.04);
-		std::tuple< char, float > F = std::make_tuple('F', 0.02);
-		std::tuple< char, float > G = std::make_tuple('G', 0.01);
-		std::tuple< char, float > H = std::make_tuple('H', 0.01);
-		std::tuple< char, float > I = std::make_tuple('I', 0.01);
-		std::tuple< char, float > J = std::make_tuple('J', 0.01);
-		std::tuple< char, float > K = std::make_tuple('K', 0.01);
-		std::tuple< char, float > L = std::make_tuple('L', 0.01);
-		std::tuple< char, float > M = std::make_tuple('M', 0.01);
-		std::tuple< char, float > N = std::make_tuple('N', 0.01);
-		proportions.emplace_back(A);
-		proportions.emplace_back(B);
-		proportions.emplace_back(C);
-		proportions.emplace_back(D);
-		proportions.emplace_back(E);
-		proportions.emplace_back(F);
-		proportions.emplace_back(G);
-		proportions.emplace_back(H);
-		proportions.emplace_back(I);
-		proportions.emplace_back(J);
-		proportions.emplace_back(K);
-		proportions.emplace_back(L);
-		proportions.emplace_back(M);
-		proportions.emplace_back(N);
-		proportionsMap["FOO"] = proportions;
-		proportionsMap["BAR"] = proportions;
-		proportionsMap["BIZ"] = proportions;
-		proportionsMap["BAZ"] = proportions;
-		*/
-		return proportionsMap;
-	}
-
-	ForestBuilder::SharedPtr TreeBuilder::getForestFromSampleProportions(const std::unordered_map< std::string, std::vector< std::tuple< char, float > > >& samplesProportions)
-	{
-		std::vector< SampleTrees::SharedPtr > sampleTreesPtrs(samplesProportions.size());
-		int count = 0;
-		std::vector< std::future< void > > futureFuncts;
-		for (auto iter : samplesProportions)
-		{
-			std::string sampleName = iter.first;
-			std::vector< std::tuple< char, float > > proportions(iter.second);
-			SampleTrees::SharedPtr sampleTreesPtr = std::make_shared< SampleTrees >(sampleName);
-			auto funct = [this, count, sampleTreesPtr, proportions, &sampleTreesPtrs]()
+			bool potentialRoot = true;
+			for (auto samplePtr : this->m_sample_ptrs)
 			{
-				populateTreesFromProportions(proportions, sampleTreesPtr->getTreePtrsRef());
-				sampleTreesPtrs[count] = sampleTreesPtr;
-			};
-			futureFuncts.emplace_back(std::async(funct));
-			++count;
-		}
-		for (auto& futureFunct : futureFuncts)
-		{
-			futureFunct.wait();
-		}
-		ForestBuilder::SharedPtr forestBuilderPtr = std::make_shared< ForestBuilder >(sampleTreesPtrs);
-	}
 
-	void TreeBuilder::populateTreesFromProportions(const std::vector< std::tuple< char, float > >& proportions, std::vector< Tree::SharedPtr >* treePtrsPtr)
-	{
-		std::vector< int > parents(proportions.size(), 0);
-		parents[0] = -1; // the root doesn't have a parent
-		for (int i = 1; i < parents.size(); ++i) // initialize the array
-		{
-			parents[i] = i - 1;
-		}
-		int currentIdx = parents.size() - 1;
-		int parent = currentIdx - 1;
-		while (true)
-		{
-			if (parent < 0)
-			{
-				do
+				int childSum = 0;
+				auto currentCluster = samplePtr->getClusterByID(clusterID);
+				for (auto clusterPtr : samplePtr->getClusterPtrs())
 				{
-					--currentIdx;
-					if (parents[currentIdx] > 0)
-					{
-						--parents[currentIdx];
-						break;
-					}
-				}while (currentIdx >= 1);
-				if (currentIdx == 0)
+					if (clusterPtr->getID() == clusterID) { continue; } // we don't want compare us to ourself
+					childSum += clusterPtr->getFrequency();
+				}
+				if (std::abs(childSum - this->m_threshold) > currentCluster->getFrequency())
 				{
-					/*
-					std::cout << "ending" << std::endl;
-					for (int i = 0; i < parents.size(); ++i)
-					{
-						std::cout << parents[i] << ",";
-					}
-					std::cout << std::endl;
-					*/
+					potentialRoot = false;
 					break;
 				}
-				++currentIdx;
-				for (; currentIdx < parents.size() - 1; ++currentIdx)
-				{
-					parents[currentIdx] = currentIdx - 1;
-				}
-				parent = currentIdx - 1;
 			}
-			parents[currentIdx] = parent;
-			/*
-			for (int i = 0; i < parents.size(); ++i)
+			if (potentialRoot)
 			{
-				std::cout << parents[i] << ",";
+				this->m_potential_root_ids.emplace_back(clusterID);
 			}
-			std::cout << std::endl;
-			*/
-			auto treePtr = std::make_shared< Tree >(proportions, parents);
-			treePtrsPtr->emplace_back(treePtr);
-			--parent;
 		}
-		std::cout << "trees: " << treePtrsPtr->size() << std::endl;
 	}
 
-	std::vector< Tree::SharedPtr > TreeBuilder::getTreesFromProportions1(const std::vector< std::tuple< char, float > >& proportions)
+	void TreeBuilder::setPotentialRelationships()
 	{
-		std::vector< Tree::SharedPtr > trees;
-		std::vector< std::function < void(int, std::vector< int >&) > > functions;
-		std::vector< int > parents(proportions.size(), 0);
-		parents[0] = -1; // the root doesn't have a parent
-		for (int a1 = 0; a1 >= 0; --a1)
+		if (this->m_sample_ptrs.size() == 0) { return; }
+		auto clusterIDs = this->m_sample_ptrs[0]->getAllClusterIDs();
+		for (int clusterID : clusterIDs)
 		{
-			parents[1] = a1;
-			for (int a2 = 1; a2 >= 0; --a2)
+			if (this->m_potential_cluster_id_children_id_map.find(clusterID) == this->m_potential_cluster_id_children_id_map.end())
 			{
-				parents[2] = a2;
-				for (int a3 = 2; a3 >= 0; --a3)
+				std::vector< int > children;
+				std::vector< int > parents;
+				this->m_potential_cluster_id_children_id_map.emplace(clusterID, children);
+				this->m_potential_cluster_id_parent_id_map.emplace(clusterID, parents);
+			}
+			float smallestClusterFrequency = 1;
+			float largestClusterFrequency = 0;
+			for (auto samplePtr : this->m_sample_ptrs)
+			{
+				auto currentCluster = samplePtr->getClusterByID(clusterID);
+				if (currentCluster == nullptr) { continue; } // skip if the custerID is not found
+				smallestClusterFrequency = (currentCluster->getFrequency() < smallestClusterFrequency) ? currentCluster->getFrequency() : smallestClusterFrequency;
+				largestClusterFrequency = (currentCluster->getFrequency() > largestClusterFrequency) ? currentCluster->getFrequency() : largestClusterFrequency;
+			}
+			bool potentialChild = true;
+			bool potentialParent = true;
+			for (int potentialClusterID : clusterIDs)
+			{
+				if (clusterID == potentialClusterID) { continue; }
+				for (auto samplePtr : this->m_sample_ptrs)
 				{
-					parents[3] = a3;
-					for (int a4 = 3; a4 >= 0; --a4)
-					{
-						parents[4] = a4;
-						for (int a5 = 4; a5 >= 0; --a5)
-						{
-							parents[5] = a5;
-							for (int a6 = 5; a6 >= 0; --a6)
-							{
-								parents[6] = a6;
-								for (int a7 = 6; a7 >= 0; --a7)
-								{
-									parents[7] = a7;
-									for (int a8 = 7; a8 >= 0; --a8)
-									{
-										parents[8] = a8;
-										for (int a9 = 8; a9 >= 0; --a9)
-										{
-											parents[9] = a9;
-											for (int a10 = 9; a10 >= 0; --a10)
-											{
-												parents[10] = a10;
-												auto treePtr = std::make_shared< Tree >(proportions, parents);
-												trees.emplace_back(treePtr);
-											}
-										}
-									}
-								}
-							}
-						}
-					}
+					auto currentCluster = samplePtr->getClusterByID(clusterID);
+					auto potentialCluster = samplePtr->getClusterByID(potentialClusterID);
+					if (currentCluster->getFrequency() < std::abs(potentialCluster->getFrequency() - this->m_threshold)) { potentialChild = false; } // checking if potentialCluster could not be a child a child of currentCluster
+					if (potentialCluster->getFrequency() < std::abs(currentCluster->getFrequency() - this->m_threshold)) { potentialParent = false; } // checking if potentialCluster could not be a parent of currentCluster
+				}
+				if (potentialChild)
+				{
+					this->m_potential_cluster_id_children_id_map[clusterID].emplace_back(potentialClusterID);
+				}
+				if (potentialParent)
+				{
+					this->m_potential_cluster_id_parent_id_map[clusterID].emplace_back(potentialClusterID);
 				}
 			}
 		}
-		std::cout << "trees: " << trees.size() << std::endl;
-		return trees;
 	}
 
-	/*
-	std::vector< Tree::SharedPtr > TreeBuilder::getTreesFromProportions(const std::vector< std::tuple< char, float > >& proportions)
+	std::vector< Tree::SharedPtr > TreeBuilder::generateAllPossibleTrees()
 	{
-		// it is presumed that the proportions are sorted by the float
-		std::vector< Tree::SharedPtr > trees;
-		std::vector< int > parents(proportions.size(), 0);
-		return trees;
-	}
-	*/
-
-	/*
-	std::vector< Tree::SharedPtr > TreeBuilder::getTreesFromProportions(const std::vector< std::tuple< char, float > >& proportions)
-	{
-		// it is presumed that the proportions are sorted by the float
-		std::vector< Tree::SharedPtr > trees;
-		std::vector< std::function < void(int, std::vector< int >&) > > functions;
-		for (int i = 0; i < proportions.size(); ++i)
+		std::vector< Tree::SharedPtr > potentialTreePtrs;
+		for (auto rootID : this->m_potential_root_ids)
 		{
-			auto funct = [&proportions, &trees](int idx, std::vector< int >& parentIdxs)
-			{
-				for (int j = idx - 1; j >= 0; --j)
-				{
-					parentIdxs[idx] = j;
-					auto treePtr = std::make_shared< Tree >(proportions, parentIdxs);
-					trees.emplace_back(treePtr);
-				}
-			};
-			functions.emplace_back(funct);
+			auto tmpPotentialTreePtrs = generateAllTreesFromRoot(rootID);
+			potentialTreePtrs.insert(potentialTreePtrs.end(), tmpPotentialTreePtrs.begin(), tmpPotentialTreePtrs.end());
 		}
-		std::vector< int > parents(proportions.size(), 0);
-		parents[0] = -1; // the root doesn't have a parent
-		for (int i = 1; i < proportions.size(); ++i)
+		return validatedTrees(potentialTreePtrs);
+	}
+
+	std::vector< Tree::SharedPtr > TreeBuilder::generateAllTreesFromRoot(int rootID)
+	{
+		std::vector< Tree::SharedPtr > treePtrs;
+
+		std::vector< std::vector< int > > parentsList(m_potential_cluster_id_parent_id_map.size());
+		int rootCount = 0;
+		for (auto iter : m_potential_cluster_id_parent_id_map)
 		{
-			for (auto funct : functions)
+			parentsList[iter.first] = iter.second;
+			if (iter.second.size() == 0) { ++rootCount; }
+		}
+		if (rootCount > 1)
+		{
+			std::cout << "There are no valid tree structures for this data" << std::endl;
+			exit(0);
+		}
+		std::vector< int > sizeArray(parentsList.size(), 0);
+		std::vector< int > counterArray(parentsList.size(), 0);
+		int totalCombinationCount = 1;
+		for (int i = 0; i < parentsList.size(); ++i)
+		{
+			sizeArray[i] = parentsList[i].size();
+			totalCombinationCount = (parentsList[i].size() > 0) ? parentsList[i].size() : totalCombinationCount;
+		}
+
+		std::vector< std::vector< int > > combinationList(totalCombinationCount);
+		int count = 0;
+		for (int countdown = totalCombinationCount; countdown > 0; --countdown)
+		{
+
+			combinationList[count].resize(parentsList.size());
+			for (int i = 0; i < parentsList.size(); ++i)
 			{
-				funct(i, parents);
+				combinationList[count][i] = (parentsList[i].size() == 0) ? -1 : parentsList[i][counterArray[i]];
+			}
+			auto treePtr = std::make_shared< Tree >(combinationList[count]);
+			treePtrs.emplace_back(treePtr);
+			++count;
+
+			for (int incIndex =  parentsList.size() - 1; incIndex >= 0; --incIndex)
+			{
+				if (counterArray[incIndex] + 1 < sizeArray[incIndex]) {
+					++counterArray[incIndex];
+					break;
+				}
+				counterArray[incIndex] = 0;
 			}
 		}
-		std::cout << "we created " << trees.size() << " trees" << std::endl;
-		return trees;
+		return treePtrs;
 	}
-	*/
+
+	std::vector< Tree::SharedPtr > TreeBuilder::validatedTrees(const std::vector< Tree::SharedPtr >& potentialTreePtrs)
+	{
+		std::vector< Tree::SharedPtr > validatedTreePtrs;
+		for (auto potentialTreePtr : potentialTreePtrs)
+		{
+			if (potentialTreePtr->isValidTree(this->m_sample_ptrs, this->m_threshold))
+			{
+				validatedTreePtrs.emplace_back(potentialTreePtr);
+			}
+		}
+		return validatedTreePtrs;
+	}
+
 }

@@ -1,16 +1,18 @@
 #include <iostream>
 
-#include "core_new/PopulationFileProcessor.h"
-#include "core_new/Population.h"
-#include "core_new/SamplesProcessor.h"
-#include "core_new/TreeBuilder.h"
+#include "core/SampleFileProcessor.h"
+#include "core/Cluster.h"
+// #include "core/SamplesProcessor.h"
+#include "core/TreeBuilder.h"
 
 int main(int argc, char** argv)
 {
 	float threshold = 0.01;
-    auto populationFileProcessorPtr = std::make_shared< superseeker::PopulationFileProcessor >("foo.txt");
-    auto samplePtrs = populationFileProcessorPtr->getSamplePtrs(threshold);
-    auto samplesProcessorPtr = std::make_shared< superseeker::SamplesProcessor >(samplePtrs);
-	auto treePtrs = samplesProcessorPtr->generateTreesFromSamples();
+    auto sampleFileProcessorPtr = std::make_shared< superseeker::SampleFileProcessor >("/scratch/ucgd/lustre/work/u0105808/SuperSeeker/tests/washu/UPN400220", threshold);
+    auto samplePtrs = sampleFileProcessorPtr->getSamplePtrs();
+	auto treeBuilderPtr = std::make_shared< superseeker::TreeBuilder >(samplePtrs, threshold);
+	auto treePtrs = treeBuilderPtr->generateAllPossibleTrees();
+    // auto samplesProcessorPtr = std::make_shared< superseeker::SamplesProcessor >(samplePtrs);
+	// auto treePtrs = samplesProcessorPtr->generateTreesFromSamples();
 	return 0;
 }
