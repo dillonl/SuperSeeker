@@ -1,7 +1,6 @@
 #pragma once
 
 #include "Tree.h"
-#include "SamplesProcessor.h"
 
 #include <vector>
 #include <memory>
@@ -18,7 +17,7 @@ namespace superseeker
 
 	private:
 		std::vector< Tree::SharedPtr > validatedTrees(const std::vector< Tree::SharedPtr >& potentialTreePtrs);
-		std::vector< Tree::SharedPtr > generateAllTreesFromRoot(int rootID);
+		/* std::vector< Tree::SharedPtr > generateAllTreesFromRoot(int rootID); */
 		void setPotentialRoots();
 		void setPotentialRelationships();
 

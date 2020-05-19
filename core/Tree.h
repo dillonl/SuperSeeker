@@ -20,12 +20,13 @@ namespace superseeker
 		~Tree();
 
 		bool isValidTree(const std::vector< Sample::SharedPtr >& samplePtrs, float threshold);
+		std::string getDotFormat(const std::vector< Sample::SharedPtr >& samplePtrs);
 
 	private:
 		bool isValidSampleTree(Sample::SharedPtr samplePtr, int threshold);
 
 		Node::SharedPtr m_root_node_ptr;
-		std::vector< Node::SharedPtr > m_parents_list;
+		std::vector< int > m_parents_list;
 		std::unordered_map< int, Node::SharedPtr > m_node_map;
 		std::vector< Node::SharedPtr > m_leaf_node_ptrs;
 	};
